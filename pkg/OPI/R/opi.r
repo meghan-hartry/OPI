@@ -152,6 +152,14 @@ opi.implementations <- list(
         opiSetBackground = "display.opiSetBackground",
         opiQueryDevice   = "display.opiQueryDevice",
         opiPresent       = "display.opiPresent"
+    ),
+    list(
+        name="Vive",
+        opiInitialize    = "vive.opiInitialize",
+        opiClose         = "vive.opiClose",
+        opiSetBackground = "vive.opiSetBackground",
+        opiQueryDevice   = "vive.opiQueryDevice",
+        opiPresent       = "vive.opiPresent"
     )
 )
 
@@ -189,6 +197,7 @@ opi.implementations <- list(
 #'   \item\code{"Imo"} for interfacing with CrewT's Imo head mounted perimeter.
 #'   \item\code{"DayDream"} for interfacing with an Android phone in a Google Daydream
 #'   \item\code{"Display"} for interfacing with a shiny plot area on the current machine.
+#'   \item\code{"Vive"} for interfacing with Unity Game Engine and an HTC Vive Pro.
 #'   \item\code{NULL}         print a list of available OPI implementations.
 #' }
 #' @return Returns TRUE if successful, FALSE otherwise.
