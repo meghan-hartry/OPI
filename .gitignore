@@ -11,3 +11,5 @@ pkg/OPI_*.tar.gz
 *.Rcheck
 *.r~
 OPI.Rproj
+pkg/test.R
+OPI-R.Rproj

@@ -7,12 +7,13 @@ OPI_R =	\
     dbTocd.r \
     fourTwo.r full_threshold.r full_threshold_state.r zest.r mocs.r \
     imoClient.r kowaAP7000Client.r octopus600.r octopus900Client.r \
+    dayDreamClient.r viveClient.r \
     opi.r \
     simDisplay.r simG.r simH.r simH_RT.r simNo.r simYes.r
 
 # Rd files for OPI package
 OPI_MAN	= \
-    FT.Rd OPI-package.Rd RtDbUnits.Rd RtSigmaUnits.Rd ZEST.Rd cdTodb.Rd\
+    RtDbUnits.Rd RtSigmaUnits.Rd ZEST.Rd\
     chooseOpi.Rd dbTocd.Rd fourTwo.Rd opiClose.Rd opiInitialize.Rd opiKineticStimulus.Rd\
     opiPresent.Rd opiQueryDevice.Rd opiSetBackground.Rd opiStaticStimulus.Rd\
     opiTemporalStimulus.Rd
@@ -25,7 +26,7 @@ OPI_FILES	=	$(addprefix OPI/,$(OPI_ROOT)) \
 				$(addprefix OPI/R/,$(OPI_R))
 
 
-all: build check install
+all: build install
 
 check: OPI.Rcheck
 
