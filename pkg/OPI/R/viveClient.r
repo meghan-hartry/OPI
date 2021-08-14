@@ -110,6 +110,8 @@ vive.opiInitialize <- function(
     socketConnection(host=ip, port, open = "w+b", blocking = TRUE, timeout = 1000), 
     error=function(e) stop(paste("Cannot connect to server at",ip,"on port", port))
   )
+  assign("socket", socket, envir = .OpiEnv$Vive)
+  
   return(NULL)
 }
 
@@ -152,6 +154,7 @@ vive.opiPresent.opiStaticStimulus <- function(stim, nextStim) {
   # if no info about stimulus color, then it is white
   if(is.null(stim$color)) stim$color <- "white"
   
+  return(NULL)
   # make the stimulus
   bg <- ifelse(stim$eye == "L", .OpiEnv$Vive$background_left, .OpiEnv$Vive$background_right)
   len <- 51               # length of the image forced to be 51x51
