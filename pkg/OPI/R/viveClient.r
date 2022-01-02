@@ -32,7 +32,8 @@
 if (exists(".OpiEnv") && !exists("Vive", where=.OpiEnv)) {
   assign("Vive", new.env(25), envir=.OpiEnv)
   
-  .OpiEnv$Vive$endian <- "little"
+  .OpiEnv$Vive$ip <- "127.0.0.1"
+  .OpiEnv$Vive$port <- 50008
   .OpiEnv$Vive$socket <- NA
   
   .OpiEnv$Vive$LUT <- NA # look up table
@@ -154,48 +155,32 @@ vive.opiPresent.opiStaticStimulus <- function(stim, nextStim) {
   # if no info about stimulus color, then it is white
   if(is.null(stim$color)) stim$color <- "white"
   
-  return(NULL)
-  # make the stimulus
-  bg <- ifelse(stim$eye == "L", .OpiEnv$Vive$background_left, .OpiEnv$Vive$background_right)
-  len <- 51               # length of the image forced to be 51x51
-  radius <- (len - 1) / 2 # and radius too
-  npix <- len^2           # get number of pixels
-  im <- matrix(bg, 3, npix)
+  # send message to present the stimulus
+  msg <- paste("OPI_PRESENT", stim$eye, stim$x, stim$y, stim$size, stim$duration, stim$responseWindow, sep=" ")
+  writeLines(msg, .OpiEnv$Vive$socket)
   
-  x <- 0:(npix - 1) %% len
-  y <- 0:(npix - 1) %/% len
-  if(stim$color == "red")        idx <- 1
-  else if(stim$color == "green") idx <- 2
-  else if(stim$color == "blue")  idx <- 3
-  else                           idx <- 1:3
-  im[idx,(x - radius)^2 + (y - radius)^2 < radius^2] <- find_pixel_value(stim$level)
-  if (load_image(im, len, len)) {
-    msg <- paste("OPI_MONO_PRESENT", stim$eye, stim$x, stim$y, stim$size, stim$duration, stim$responseWindow, sep=" ")
-    writeLines(msg, .OpiEnv$Vive$socket)
-    
-    seen <- readBin(.OpiEnv$Vive$socket, "integer", size=1)
-    time <- readBin(.OpiEnv$Vive$socket, "double", size=4, endian=.OpiEnv$Vive$endian)
-    readBin(.OpiEnv$Vive$socket, "integer", size=1, endian=.OpiEnv$Vive$endian) # the \n
-    # seen or not seen? if 1, then seen is TRUE, otherwise is FALSE
-    seen <- seen == "1"
-    
-    if (!seen && time == 0)
-      return(list(err="Background image not set", seen=NA, time=NA))
-    if (!seen && time == 1)
-      return(list(err="Trouble with stim image", seen=NA, time=NA))
-    if (!seen && time == 2)
-      return(list(err="Location out of range for Vive", seen=NA, time=NA))
-    if (!seen && time == 3)
-      return(list(err="OPI present error back from Vive", seen=NA, time=NA))
-    
-    return(list(
-      err  = NULL,
-      seen = seen,    # assumes 1 or 0, not "true" or "false"
-      time = time
-    ))
-  } else {
-    return(list(err="OPI present could not load stimulus image", seen=NA, time=NA))
-  }
+  return(NULL)
+  # record results
+  seen <- readBin(.OpiEnv$Vive$socket, "integer", size=1)
+  time <- readBin(.OpiEnv$Vive$socket, "double", size=4, endian=.OpiEnv$Vive$endian)
+  readBin(.OpiEnv$Vive$socket, "integer", size=1, endian=.OpiEnv$Vive$endian) # the \n
+  # seen or not seen? if 1, then seen is TRUE, otherwise is FALSE
+  seen <- seen == "1"
+  
+  if (!seen && time == 0)
+    return(list(err="Background image not set", seen=NA, time=NA))
+  if (!seen && time == 1)
+    return(list(err="Trouble with stim image", seen=NA, time=NA))
+  if (!seen && time == 2)
+    return(list(err="Location out of range for daydream", seen=NA, time=NA))
+  if (!seen && time == 3)
+    return(list(err="OPI present error back from daydream", seen=NA, time=NA))
+  
+  return(list(
+    err  = NULL,
+    seen = seen,    # assumes 1 or 0, not "true" or "false"
+    time = time
+  ))
 }
 
 ########################################## 
