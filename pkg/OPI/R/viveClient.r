@@ -49,6 +49,8 @@ if (exists(".OpiEnv") && !exists("Vive", where=.OpiEnv)) {
   .OpiEnv$Vive$background_color <- NA
   .OpiEnv$Vive$fix_color        <- NA
   
+  
+  
   .OpiEnv$Vive$SEEN     <- 1  
   .OpiEnv$Vive$NOT_SEEN <- 0  
 }
@@ -151,31 +153,21 @@ vive.opiPresent.opiStaticStimulus <- function(stim, nextStim) {
   if (is.null(stim$level)) return(list(err="No level in stimulus", seen=NA, time=NA))
   if (is.null(stim$duration)) return(list(err="No duration in stimulus", seen=NA, time=NA))
   if (is.null(stim$responseWindow)) return(list(err="No responseWindow in stimulus", seen=NA, time=NA))
-  if (is.null(stim$eye)) return(list(err="No eye in stimulus", seen=NA, time=NA))
+
+  # if no info about eye, then it is both  
+  if(is.null(stim$color)) stim$eye <- "both"
+  
   # if no info about stimulus color, then it is white
   if(is.null(stim$color)) stim$color <- "white"
   
   # send message to present the stimulus
-  msg <- paste("OPI_PRESENT", stim$eye, stim$x, stim$y, stim$size, stim$duration, stim$responseWindow, sep=" ")
+  msg <- paste("OPI_PRESENT", stim$eye, stim$x, stim$y, stim$level, stim$size, stim$duration, stim$responseWindow, sep=" ")
   writeLines(msg, .OpiEnv$Vive$socket)
   
-  return(NULL)
   # record results
-  seen <- readBin(.OpiEnv$Vive$socket, "integer", size=1)
-  time <- readBin(.OpiEnv$Vive$socket, "double", size=4, endian=.OpiEnv$Vive$endian)
-  readBin(.OpiEnv$Vive$socket, "integer", size=1, endian=.OpiEnv$Vive$endian) # the \n
-  # seen or not seen? if 1, then seen is TRUE, otherwise is FALSE
-  seen <- seen == "1"
-  
-  if (!seen && time == 0)
-    return(list(err="Background image not set", seen=NA, time=NA))
-  if (!seen && time == 1)
-    return(list(err="Trouble with stim image", seen=NA, time=NA))
-  if (!seen && time == 2)
-    return(list(err="Location out of range for daydream", seen=NA, time=NA))
-  if (!seen && time == 3)
-    return(list(err="OPI present error back from daydream", seen=NA, time=NA))
-  
+  seen <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
+  time <- readBin(.OpiEnv$Vive$socket, "integer", size=4)
+
   return(list(
     err  = NULL,
     seen = seen,    # assumes 1 or 0, not "true" or "false"
@@ -210,10 +202,9 @@ vive.opiPresent.opiTemporalStimulus <- function(stim, nextStim=NULL, ...) {
 #' \subsection{Vive}{
 #'   \code{opiSetBackground(lum=10, color="white", fixation="Cross", fix_cx=0, fix_cy=0, fix_sx=2, fix_sy=2, fix_lum=10, fix_color="green", eye="L")}
 #'   \itemize{
-#'     \item{\code{lum}} background luminance in cd/\eqn{\mbox{m}^2}{m^2} is set to nearest grey
-#'       value in \code{lut} from \code{opiInitialize}. Default is 10 cd/\eqn{\mbox{m}^2}{m^2}
-#'     \item{\code{color}} color of the background. It can be \code{'white'} (default) or
-#'       \code{'green'}.
+#'     \item{\code{eye}} change the background on the \code{'left'}, \code{'right'}, or \code{'both'} (default)
+#'     \item{\code{color}} color of the background. It can be the name of a basic color such as \code{'white'} (default)
+#'     \item{\code{RGB}} color of the background (overrides \code{color}). Specify an RGB vector such as \code{c(255, 255, 255)}
 #'     \item{\code{fixation}} can only be \code{'Cross'} at the moment.
 #'     \item{\code{fix_cx}, \code{fix_cy}} fixation (x, y) position in degrees
 #'       of visual angle
@@ -230,61 +221,20 @@ vive.opiPresent.opiTemporalStimulus <- function(stim, nextStim=NULL, ...) {
 #' \subsection{Vive}{ 
 #'   DETAILS
 #' }
-vive.opiSetBackground <- function(eye, lum=10, color="white", fixation="Cross",
-                                      fix_cx=0, fix_cy=0, fix_sx=2, fix_sy=2,
-                                      fix_color="green") {
-  if (is.na(lum)) {
-    warning('Cannot set background to NA in opiSetBackground')
-    return('Cannot set background to NA in opiSetBackground')
+vive.opiSetBackground <- function(eye="both", color="white", RGB=NULL, fixation="Cross") {
+  if (is.null(RGB)) {
+    msg <- paste("OPI_SET_BGROUND", color, sep=" ")
+    writeLines(msg, .OpiEnv$Vive$socket)
   }
-  if (is.na(color)) {
-    color = "white"
-    warning('Background color set to \'white\' by default')
+  else{
+    RGBmsg <- paste(RGB, collapse=" ")
+    msg <- paste("OPI_SET_BGROUND", RGBmsg, sep=" ")
+    writeLines(msg, .OpiEnv$Vive$socket)
   }
-  # get pixel value of background from luminance in cd/m2
-  bg <- find_pixel_value(lum)
-  writeLines(paste("OPI_MONO_SET_BG", eye, bg), .OpiEnv$Vive$socket)
-  res <- readLines(.OpiEnv$Vive$socket, n=1)
-  if (res != "OK")
-    return(paste0("Cannot set background to ",bg," in opiSetBackground"))
-  # add background information
-  .OpiEnv$Vive$background_color   <- color
-  .OpiEnv$Vive$fix_color          <- fix_color
-  if (eye == "L") {
-    .OpiEnv$Vive$background_left  <- bg
-    .OpiEnv$Vive$background_right <- 0
-  } else {
-    .OpiEnv$Vive$background_left  <- 0
-    .OpiEnv$Vive$background_right <- bg
-  }   
-  # if even, add 1 to fixation size
-  imsize <- 51
-  m <- (imsize + 1) / 2
-  # design fixation target
-  npix <- imsize^2
-  im <- matrix(bg, 3, npix)
-  x <- 0:npix %% imsize + 1
-  y <- 0:npix %/% imsize + 1
-  # choose color
-  if(fix_color == "white")     col <- c(255, 255, 255)
-  else if(fix_color == "red")  col <- c(255, 0, 0)
-  else if(fix_color == "blue") col <- c(0, 0, 255)
-  else                         col <- c(0, 255, 0)
-  if(fixation == "Cross") {
-    # thickness of 5 lines
-    idx <- which((x >= m - 2 & x <= m + 2) | (y >= m - 2 & y <= m + 2))
-  } else if(fixation == "Circle") {
-    r   <- (imsize - 1) / 2
-    # thickness of 5 lines
-    idx <- which((x - m)^2 + (y - m)^2 < r^2 & (x - m)^2 + (y - m)^2 >= (r - 5)^2)
-  }
-  im[,idx] <- col
-  if (!load_image(im, imsize, imsize))
-    return("Trouble loading fixation image in opiSetBackground.")
-  writeLines(paste("OPI_MONO_BG_ADD", eye, fix_cx, fix_cy, fix_sx, fix_sy), .OpiEnv$Vive$socket)
-  res <- readLines(.OpiEnv$Vive$socket, n=1)
-  if (res != "OK")
-    return("Trouble adding fixation to background in opiSetBackground")
+  
+  res <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
+  if (res != TRUE)
+    return("Trouble changing background in opiSetBackground")
   return(NULL)
 }
 
