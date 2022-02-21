@@ -22,68 +22,34 @@
 #
 # Modified
 #
+# To Do:
+# Add a look up table to convert the opacity level to a cd/m^2 value
+# Add a look up table to convert the coordinate plane to degrees of visual angle
 
 ###################################################################
 # .OpiEnv$Vive$socket is the connection to the Vive
-# .OpiEnv$Vive$LUT has 256 entries. LUT[x] is cd/m^2 value for grey level x
-# .OpiEnv$Vive$fovy default is 90
 # .OpiEnv$Vive$...    constants and setting variables
 ###################################################################
 if (exists(".OpiEnv") && !exists("Vive", where=.OpiEnv)) {
   assign("Vive", new.env(25), envir=.OpiEnv)
   
-  .OpiEnv$Vive$ip <- "127.0.0.1"
-  .OpiEnv$Vive$port <- 50008
   .OpiEnv$Vive$socket <- NA
-  
-  .OpiEnv$Vive$LUT <- NA # look up table
-  .OpiEnv$Vive$fovy <- NA # Field of view for y-axis
-  
-  .OpiEnv$Vive$width <- NA        # of whole phone screen
-  .OpiEnv$Vive$height <- NA
-  .OpiEnv$Vive$single_width <- NA
-  .OpiEnv$Vive$single_height <- NA
-  
-  .OpiEnv$Vive$background_left  <- NA    # stored MONO background information
-  .OpiEnv$Vive$background_right <- NA
-  .OpiEnv$Vive$background_color <- NA
-  .OpiEnv$Vive$fix_color        <- NA
-  
-  
   
   .OpiEnv$Vive$SEEN     <- 1  
   .OpiEnv$Vive$NOT_SEEN <- 0  
 }
 
-###########################################################################
-# Find the closest pixel value (index into .OpiEnv$Vive$LUT less 1)
-# for cd/m^2 param cdm2
-###########################################################################
-find_pixel_value <- function(cdm2) {
-  # It is 8 bit depth, so it must return a value from 0 to 255
-  return(which.min(abs(.OpiEnv$Vive$LUT - cdm2)) - 1)
-}
-
 #' @rdname opiInitialize
-#' @param lut Look up table mapping pixel values to cd/m2
-#' @param fovy Field of view in degrees in the y-axis. It is different depending on the device.
-#' For Vive view, it is 90 degrees, for, Vive view 2 is 100 degrees. Default is 90.
 #' @details
 #' \subsection{Vive}{
-#'   \code{opiInitialize(ip="127.0.0.1", port=50008, lut= seq(0, 400, length.out = 256), fovy = 90)}
+#'   \code{opiInitialize(ip="127.0.0.1", port=50008)}
 #'   
-#'   If the chosen OPI implementation is \code{Vive}, then you must specify
-#'   the IP address of the Android phone that is in the Vive, and the port on
-#'   which the server running on the phone is listening.
+#'   If the chosen OPI implementation is \code{Vive}, then you may specify
+#'   the IP address and port of the socket server for the Vive.
 #'   
 #'   \itemize{
 #'     \item\code{ip} is the IP address of the Vive server as a string
 #'     \item\code{port} is the TCP/IP port of the Vive server as a number
-#'     \item\code{lut} is a vector of 256 luminance values, with \code{lut[i]} being the
-#'       cd/\eqn{\mbox{m}^2}{m^2} value for grey level i. Default is
-#'       \code{seq(0, 4000, length.out = 256)}
-#'     \item\code{fovy} Field of view in degrees in the y-axis. It is different depending on the device.
-#'       For Vive view, it is 90 degrees, for, Vive view 2 is 100 degrees. Default is 90.
 #'   }
 #' }
 #' @return
@@ -92,26 +58,13 @@ find_pixel_value <- function(cdm2) {
 #' }
 vive.opiInitialize <- function(
   ip="127.0.0.1",
-  port=50008, 
-  lut = seq(0, 400, length.out = 256), # for pixel 1 max brightness is 400
-  fovy = 90
+  port=50008
 ) {
-  cat("Looking for server at", ip, "\n")
-  suppressWarnings(tryCatch(    
-    v <- socketConnection(host = ip, port,
-                          blocking = TRUE, open = "w+b",
-                          timeout = 10)
-    , error=function(e) { 
-      stop(paste(" cannot find a server at", ip, "on port",port))
-    }
-  ))
-  close(v)
-  
   cat("Found server at",ip, "on port", port,":)\n")
   
   socket <- tryCatch(
     socketConnection(host=ip, port, open = "w+b", blocking = TRUE, timeout = 1000), 
-    error=function(e) stop(paste("Cannot connect to server at",ip,"on port", port))
+    error=function(e) stop(paste("Cannot connect to server at", ip, "on port", port))
   )
   assign("socket", socket, envir = .OpiEnv$Vive)
   
@@ -130,15 +83,26 @@ vive.opiInitialize <- function(
 #' @rdname opiPresent
 #' @details
 #' \subsection{Vive}{
+#'   \code{
+#'   stim <- list(x=2, y=2, level=100, duration=3500, responseWindow=3500, size=1, eye="left", color="white")
+#'   class(stim) <- "opiStaticStimulus"
+#'   opiPresent(stim)}
+#'   \itemize{
+#'     \item{\code{stim}} the stimulus object to present
+#'     \item{\code{stim$x}} fixation x coordinate, such as \code{1.0}.
+#'     \item{\code{stim$y}} fixation y coordinate, such as \code{1.0}.
+#'     \item{\code{stim$level}} stimulus level, as a percentage of opacity, between \code{0.00} and \code{100.00}.
+#'     \item{\code{stim$duration}} stimulus duration in milliseconds, such as \code{2000}.
+#'     \item{\code{stim$responseWindow}, stimulus response window in milliseconds, such as \code{3500}.
+#'     \item{\code{stim$size} stimulus size, as a scalar multiplier, \code{1.0} is default.
+#'     \item{\code{stim$eye}} eye to present to, can be \code{'left'}, \code{'right'}, or \code{'both'} (default).
+#'     \item{\code{stim$color}} color of the stimulus, can be \code{'white'} (default), \code{'black'}, \code{'yellow'}, \code{'clear'}, \code{'grey'}, \code{'gray'}, 
+#'       \code{'magenta'}, \code{'cyan'}, \code{'red'}, \code{'blue'}, or \code{'green'}.
+#'     \item{\code{stim$rgb}} color of the stimulus as string of RGB values separated by spaces, such as \code{'255 255 255'}, optional, overrides \code{stim$color}.
+#'   }
+#'   
 #'   If the chosen OPI implementation is \code{Vive}, then \code{nextStim}
 #'   is ignored.
-#'   
-#'   Note that the dB level is rounded to the nearest cd/\eqn{\mbox{m}^2}{m^2}
-#'   that is in the \code{lut} specified in \code{opiInitialise}.
-#'   
-#'   Currently uses the most simple algorithm for drawing a 'circle'
-#'   (ie not Bresenham's).
-#'   
 #'   Currently only implemented for \code{opiStaticStimulus}.
 #' }
 vive.opiPresent <- function(stim, nextStim=NULL) { UseMethod("vive.opiPresent") }
@@ -146,26 +110,46 @@ setGeneric("vive.opiPresent")
 
 vive.opiPresent.opiStaticStimulus <- function(stim, nextStim) {
   if (is.null(stim)) return(list(err = "no stimulus"))
-  
   if (is.null(stim$x)) return(list(err="No x coordinate in stimulus", seen=NA, time=NA))
   if (is.null(stim$y)) return(list(err="No y coordinate in stimulus", seen=NA, time=NA))
-  if (is.null(stim$size)) return(list(err="No size in stimulus", seen=NA, time=NA))
   if (is.null(stim$level)) return(list(err="No level in stimulus", seen=NA, time=NA))
   if (is.null(stim$duration)) return(list(err="No duration in stimulus", seen=NA, time=NA))
   if (is.null(stim$responseWindow)) return(list(err="No responseWindow in stimulus", seen=NA, time=NA))
 
-  # if no info about eye, then it is both  
-  if(is.null(stim$color)) stim$eye <- "both"
+  # if no info about size, then it is 1
+  if(is.null(stim$size)) stim$size <- 1
   
-  # if no info about stimulus color, then it is white
+  # if no info about eye, then it is both  
+  if(is.null(stim$eye)) stim$eye <- "both"
+  
+  # if no info about color, then it is white
   if(is.null(stim$color)) stim$color <- "white"
   
+  # if no info about stimulus RGB, then it is null
+  if(is.null(stim$rgb)) stim$rgb <- "null null null"
+  
   # send message to present the stimulus
-  msg <- paste("OPI_PRESENT", stim$eye, stim$x, stim$y, stim$level, stim$size, stim$duration, stim$responseWindow, sep=" ")
+  msg <- sprintf("OPI_PRESENT %s %0.1f %0.1f %0.2f %0.1f %0.0f %0.0f %s %s", stim$eye, stim$x, stim$y, stim$level, stim$size, stim$duration, stim$responseWindow, stim$color, stim$rgb)
   writeLines(msg, .OpiEnv$Vive$socket)
   
   # record results
-  seen <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
+  seenBool <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
+  
+  # if no info returned, error
+  if(is.null(seenBool)){
+    return(list(
+      err  = "Unknown error",
+      seen = 0, 
+      time = 0
+    ))
+  }
+  
+  if(seenBool){
+    seen<-1
+  }else{
+    seen<-0
+  }
+  
   time <- readBin(.OpiEnv$Vive$socket, "integer", size=4)
 
   return(list(
@@ -192,45 +176,39 @@ vive.opiPresent.opiTemporalStimulus <- function(stim, nextStim=NULL, ...) {
 }#opiPresent.opiTemporalStimulus()
 
 #' @rdname opiSetBackground
-#' @param fix_cx fixation x position in degrees of visual angle. Default is 0
-#' @param fix_cy fixation y position in degrees of visual angle. Default is 0
-#' @param fix_sx fixation horizontal size in degrees of visual angle. Default is 1
-#' @param fix_sy fixation vertical size in degrees of visual angle. Default is 1
-#' @param fix_color fixation color
-#' @param eye eye
+#' @param fix_cx fixation x coordinate position. Default is \code{0.0}.
+#' @param fix_cy fixation y coordinate position. Default is \code{0.0}.
+#' @param fix_sx fixation horizontal size scalar multiplier. Default is \code{1.0}.
+#' @param fix_sy fixation vertical size scalar multiplier. Default is \code{1.0}.
+#' @param fix_color fixation color. Default is \code{'white'}.
+#' @param eye sets the active background configuration. Default is \code{'left'}.
 #' @details
 #' \subsection{Vive}{
-#'   \code{opiSetBackground(lum=10, color="white", fixation="Cross", fix_cx=0, fix_cy=0, fix_sx=2, fix_sy=2, fix_lum=10, fix_color="green", eye="L")}
+#'   \code{opiSetBackground(lum=100, color="white", fixation="Cross", fix_cx=0, fix_cy=0, fix_sx=1, fix_sy=1, fix_lum=100, fix_color="white", eye="null")}
 #'   \itemize{
-#'     \item{\code{eye}} change the background on the \code{'left'}, \code{'right'}, or \code{'both'} (default)
-#'     \item{\code{color}} color of the background. It can be the name of a basic color such as \code{'white'} (default)
-#'     \item{\code{RGB}} color of the background (overrides \code{color}). Specify an RGB vector such as \code{c(255, 255, 255)}
+#'     \item{\code{lum}} background opacity, as a percentage, between \code{0.00} and \code{100.00} (default).
+#'     \item{\code{color}} color of the background, can be \code{'black'} (default), \code{'white'}, \code{'yellow'}, \code{'clear'}, \code{'grey'}, \code{'gray'}, 
+#'       \code{'magenta'}, \code{'cyan'}, \code{'red'}, \code{'blue'}, or \code{'green'}.
+#'     \item{\code{rgb}} color of the background as string of RGB values separated by spaces, such as \code{'255 255 255'}, optional, overrides \code{color}.
 #'     \item{\code{fixation}} can only be \code{'Cross'} at the moment.
-#'     \item{\code{fix_cx}, \code{fix_cy}} fixation (x, y) position in degrees
-#'       of visual angle
-#'     \item{\code{fix_sx}, \code{fix_sy}} dimensions of fixation target in
-#'       degrees of visual angle
-#'     \item{\code{fix_lum}} luminance of the fixation target in cd/\eqn{\mbox{m}^2}{m^2} is set to
-#'       nearest grey value in \code{lut} from \code{opiInitialize}. Default
-#'       is 15 cd/\eqn{\mbox{m}^2}{m^2}
-#'     \item{\code{fix_color}} color of the fixation target. It can be \code{'white'} or
-#'       \code{'green'}  (default).
+#'     \item{\code{fix_cx}, \code{fix_cy}} fixation (x, y) coordinate positions
+#'     \item{\code{fix_sx}, \code{fix_sy}} dimensions of fixation target as scalar multipliers
+#'     \item{\code{fix_lum}} CURRENTLY IGNORED. fixation opacity, as a percentage, between \code{0.00} and \code{100.00} (default). 
+#'     \item{\code{fix_color}} color of the fixation target, can be \code{'white'} (default), \code{'black'}, \code{'yellow'}, \code{'clear'}, \code{'grey'}, \code{'gray'}, 
+#'       \code{'magenta'}, \code{'cyan'}, \code{'red'}, \code{'blue'}, or \code{'green'}.
+#'     \item{\code{fix_rgb}} color of the fixation target as string of RGB values separated by spaces, such as \code{'255 255 255'}, optional, overrides \code{fix_color}.
+#'     \item{\code{eye}} Sets the background configuration, can be \code{'left'}, \code{'right'}, or \code{'both'} (default).
 #'   }
 #' }
 #' @return
 #' \subsection{Vive}{ 
 #'   DETAILS
 #' }
-vive.opiSetBackground <- function(eye="both", color="white", RGB=NULL, fixation="Cross") {
-  if (is.null(RGB)) {
-    msg <- paste("OPI_SET_BGROUND", color, sep=" ")
-    writeLines(msg, .OpiEnv$Vive$socket)
-  }
-  else{
-    RGBmsg <- paste(RGB, collapse=" ")
-    msg <- paste("OPI_SET_BGROUND", RGBmsg, sep=" ")
-    writeLines(msg, .OpiEnv$Vive$socket)
-  }
+vive.opiSetBackground <- function(lum=100, color="black", rgb="NULL NULL NULL", fixation="Cross", 
+                                  fix_cx=0.0, fix_cy=0.0, fix_sx=1.0, fix_sy=1.0, fix_lum=100.00,
+                                  fix_color="white", fix_rgb="NULL NULL NULL", eye="both") {
+  msg <- sprintf("OPI_SET_BGROUND %s %0.1f %0.1f %0.1f %0.1f %0.2f %s %s %0.2f %s %s %s", fixation, fix_cx, fix_cy, fix_sx, fix_sy, fix_lum, fix_color, fix_rgb, lum, color, rgb, eye)
+  writeLines(msg, .OpiEnv$Vive$socket)
   
   res <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
   if (res != TRUE)
@@ -257,27 +235,24 @@ vive.opiClose <- function() {
   
   close(.OpiEnv$Vive$socket)
   
-  if (res != "OK")
+  if (!res)
     return(list(err="Trouble closing Vive connection."))
   else
     return(NULL)
 }
 
 ##############################################################################
-#### Lists defined constants
+#### Test Connection
 ##############################################################################
 #' @rdname opiQueryDevice
 #' @title Query device using OPI
 #' @details
 #' \subsection{Vive}{
-#'   Returns all constants in \code{.OpiEnv$Vive} as a list.
-#' }
-#' \subsection{Vive}{
-#'   DETAILS
+#'   Returns whether the socket port has a valid connection.
 #' }
 vive.opiQueryDevice <- function() {
-  vars <- ls(.OpiEnv$Vive)
-  lst <- lapply(vars, function(i) .OpiEnv$Vive[[i]])
-  names(lst) <- vars
-  return(lst)
+  msg <- paste("OPI_QUERY_DEVICE")
+  writeLines(msg, .OpiEnv$Vive$socket)
+  res <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
+  return(res)
 }
