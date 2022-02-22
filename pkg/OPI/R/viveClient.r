@@ -186,14 +186,14 @@ vive.opiPresent.opiTemporalStimulus <- function(stim, nextStim=NULL, ...) {
 #' \subsection{Vive}{
 #'   \code{opiSetBackground(lum=100, color="white", fixation="Cross", fix_cx=0, fix_cy=0, fix_sx=1, fix_sy=1, fix_lum=100, fix_color="white", eye="null")}
 #'   \itemize{
-#'     \item{\code{lum}} background opacity, as a percentage, between \code{0.00} and \code{100.00} (default).
+#'     \item{\code{lum}} CURRENTLY IGNORED. background opacity, as a percentage, between \code{0.00} and \code{100.00} (default).
 #'     \item{\code{color}} color of the background, can be \code{'black'} (default), \code{'white'}, \code{'yellow'}, \code{'clear'}, \code{'grey'}, \code{'gray'}, 
 #'       \code{'magenta'}, \code{'cyan'}, \code{'red'}, \code{'blue'}, or \code{'green'}.
 #'     \item{\code{rgb}} color of the background as string of RGB values separated by spaces, such as \code{'255 255 255'}, optional, overrides \code{color}.
 #'     \item{\code{fixation}} can only be \code{'Cross'} at the moment.
 #'     \item{\code{fix_cx}, \code{fix_cy}} fixation (x, y) coordinate positions
 #'     \item{\code{fix_sx}, \code{fix_sy}} dimensions of fixation target as scalar multipliers
-#'     \item{\code{fix_lum}} CURRENTLY IGNORED. fixation opacity, as a percentage, between \code{0.00} and \code{100.00} (default). 
+#'     \item{\code{fix_lum}} fixation opacity, as a percentage, between \code{0.00} and \code{100.00} (default). 
 #'     \item{\code{fix_color}} color of the fixation target, can be \code{'white'} (default), \code{'black'}, \code{'yellow'}, \code{'clear'}, \code{'grey'}, \code{'gray'}, 
 #'       \code{'magenta'}, \code{'cyan'}, \code{'red'}, \code{'blue'}, or \code{'green'}.
 #'     \item{\code{fix_rgb}} color of the fixation target as string of RGB values separated by spaces, such as \code{'255 255 255'}, optional, overrides \code{fix_color}.
@@ -230,15 +230,9 @@ vive.opiSetBackground <- function(lum=100, color="black", rgb="NULL NULL NULL", 
 #' }
 vive.opiClose <- function() {
   writeLines("OPI_CLOSE", .OpiEnv$Vive$socket)
-  
-  res <- readLines(.OpiEnv$Vive$socket, n=1)
-  
+  res <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
   close(.OpiEnv$Vive$socket)
-  
-  if (!res)
-    return(list(err="Trouble closing Vive connection."))
-  else
-    return(NULL)
+  return(res)
 }
 
 ##############################################################################
@@ -251,8 +245,7 @@ vive.opiClose <- function() {
 #'   Returns whether the socket port has a valid connection.
 #' }
 vive.opiQueryDevice <- function() {
-  msg <- paste("OPI_QUERY_DEVICE")
-  writeLines(msg, .OpiEnv$Vive$socket)
+  writeLines("OPI_QUERY_DEVICE", .OpiEnv$Vive$socket)
   res <- readBin(.OpiEnv$Vive$socket, "logical", size=1)
   return(res)
 }
