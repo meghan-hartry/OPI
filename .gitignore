@@ -4,7 +4,6 @@ Thumbs.db
 .DS_Store
 .classpath
 .project
-pkg/OPI_*.tar.gz
 .RData
 .Rhistory
 .Rproj.user
